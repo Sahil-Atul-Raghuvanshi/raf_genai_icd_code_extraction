@@ -8,3 +8,10 @@ class Diagnosis(BaseModel):
 
 class ICDLLMResponse(BaseModel):
     diagnoses: List[Diagnosis]
+
+class BatchChunkResult(BaseModel):
+    chunk_number: int
+    diagnoses: List[Diagnosis]
+
+class BatchICDResponse(BaseModel):
+    results: List[BatchChunkResult]

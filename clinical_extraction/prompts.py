@@ -60,3 +60,57 @@ WRONG format (do NOT do this):
 }}
 """
 )
+
+ICD_SEMANTIC_BATCH_PROMPT = PromptTemplate(
+    input_variables=["chunks_text", "num_chunks"],
+    template="""
+You are a certified medical coder using the official 2026 ICD-10-CM codes from CMS.
+
+Analyze the following {num_chunks} clinical text chunks and extract confirmed chronic medical conditions from EACH chunk separately.
+
+CRITICAL: Process each chunk independently and return results in the SAME ORDER.
+
+{chunks_text}
+
+For EACH chunk, return:
+- condition: Detailed description matching ICD-10-CM long description
+- icd10: Single ICD-10-CM code (billable, specific)
+- evidence_snippet: Exact quote from that chunk (5-20 words)
+
+Rules:
+- Use ONLY valid 2026 ICD-10-CM codes
+- Return ONE code per diagnosis (do NOT combine codes)
+- Include evidence_snippet as verbatim quote from text
+- If no conditions in a chunk, return empty diagnoses list for that chunk
+- Ignore negated, ruled-out, suspected conditions
+
+Output format:
+{{
+  "results": [
+    {{
+      "chunk_number": 1,
+      "diagnoses": [
+        {{
+          "condition": "Type 2 diabetes mellitus without complications",
+          "icd10": "E11.9",
+          "evidence_snippet": "history of type 2 diabetes, well controlled"
+        }}
+      ]
+    }},
+    {{
+      "chunk_number": 2,
+      "diagnoses": [
+        {{
+          "condition": "Essential hypertension",
+          "icd10": "I10",
+          "evidence_snippet": "patient has longstanding hypertension"
+        }}
+      ]
+    }}
+  ]
+}}
+
+CRITICAL: Return exactly {num_chunks} results, one for each chunk, in the same order.
+If a chunk has no conditions, include it with empty diagnoses list.
+"""
+)
