@@ -1,6 +1,6 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import PydanticOutputParser
-from .prompts import ICD_SEMANTIC_PROMPT, ICD_SEMANTIC_BATCH_PROMPT
+from .prompts import ICD_SEMANTIC_PROMPT, ICD_SEMANTIC_BATCH_PROMPT, GEM_SELECTION_PROMPT
 from .schema import ICDLLMResponse, BatchICDResponse
 from utils.config import GOOGLE_API_KEY
 from utils.rate_limiter import BatchRateLimiter
@@ -22,6 +22,15 @@ llm_batch = ChatGoogleGenerativeAI(
     google_api_key=GOOGLE_API_KEY,
     temperature=0,
     request_timeout=90,  # Longer timeout for batch processing
+)
+
+# LLM for GEM mapping selection (shared with other modules)
+# Same configuration as semantic LLM for consistency
+llm_gem = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",  # High accuracy for code selection
+    google_api_key=GOOGLE_API_KEY,
+    temperature=0,
+    request_timeout=30
 )
 
 parser = PydanticOutputParser(pydantic_object=ICDLLMResponse)

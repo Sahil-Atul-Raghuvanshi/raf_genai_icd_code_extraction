@@ -114,3 +114,34 @@ CRITICAL: Return exactly {num_chunks} results, one for each chunk, in the same o
 If a chunk has no conditions, include it with empty diagnoses list.
 """
 )
+
+# Prompt template for selecting best ICD-10 code from multiple GEM mappings
+GEM_SELECTION_PROMPT = PromptTemplate(
+    input_variables=["icd9_code", "icd9_description", "icd10_candidates", "clinical_evidence", "clinical_context"],
+    template="""You are a certified medical coder specializing in ICD code mapping.
+
+Task: Select the SINGLE MOST APPROPRIATE ICD-10 code for the given ICD-9 code based on clinical context.
+
+**ICD-9 Code:** {icd9_code}
+**ICD-9 Description:** {icd9_description}
+
+**Available ICD-10 Code Options (from GEM mapping):**
+{icd10_candidates}
+
+**Clinical Evidence (Direct Quote from Note):**
+{clinical_evidence}
+
+**Full Clinical Context from Patient Note:**
+{clinical_context}
+
+Instructions:
+1. Read the clinical evidence and context carefully
+2. Consider the specific details mentioned (laterality, severity, complications, etc.)
+3. Select the ICD-10 code that BEST matches the clinical documentation
+4. Choose the most SPECIFIC code that is supported by the documentation
+5. Prioritize evidence from the clinical evidence snippet, use full context for additional details
+
+Return ONLY the ICD-10 code (e.g., B768), nothing else.
+Do NOT include explanations, descriptions, or any other text.
+"""
+)

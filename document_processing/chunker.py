@@ -41,26 +41,40 @@ def chunk_text_by_tokens(text: str, max_tokens: int = 200) -> List[str]:
     Keeps only full sentences.
     """
 
+    # Step 1: Protect ICD codes by replacing dots with placeholders
+    # This prevents sentence splitting from breaking codes like "E11.9" into "E11" and "9"
     protected_text = protect_icd_codes(text)
+    
+    # Step 2: Split text into individual sentences
     sentences = split_into_sentences(protected_text)
 
-    chunks = []
-    current_chunk = []
-    current_tokens = 0
+    # Initialize chunking variables
+    chunks = []           # Final list of text chunks to return
+    current_chunk = []    # Sentences being accumulated for current chunk
+    current_tokens = 0    # Token count for current chunk
 
+    # Step 3: Group sentences into chunks while respecting token limit
     for sentence in sentences:
+        # Count tokens in this sentence (simple word count)
         sentence_tokens = len(sentence.split())
 
+        # Check if adding this sentence would exceed the max_tokens limit
         if current_tokens + sentence_tokens > max_tokens:
+            # Current chunk is full, finalize it
             if current_chunk:
+                # Join sentences with spaces and restore ICD code dots
                 chunk_text = " ".join(current_chunk)
                 chunks.append(restore_icd_codes(chunk_text))
+            
+            # Reset for next chunk
             current_chunk = []
             current_tokens = 0
 
+        # Add sentence to current chunk
         current_chunk.append(sentence)
         current_tokens += sentence_tokens
 
+    # Step 4: Add the last chunk if it contains any sentences
     if current_chunk:
         chunk_text = " ".join(current_chunk)
         chunks.append(restore_icd_codes(chunk_text))

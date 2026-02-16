@@ -16,7 +16,13 @@ def is_text_valid(text: str) -> bool:
     if len(words) < 50:
         return False
     
+    # Calculate the ratio of alphabetic characters to total characters
+    # This helps identify gibberish or corrupted text (e.g., from failed PDF extraction)
+    # max(len(text), 1) prevents division by zero
     alpha_ratio = sum(c.isalpha() for c in text) / max(len(text), 1)
+    
+    # Valid text should have at least 40% alphabetic characters
+    # If ratio is too low, the extracted text is likely corrupted and needs OCR
     return alpha_ratio > 0.4
 
 
