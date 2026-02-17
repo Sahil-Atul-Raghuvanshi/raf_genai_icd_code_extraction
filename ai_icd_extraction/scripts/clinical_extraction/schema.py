@@ -15,3 +15,14 @@ class BatchChunkResult(BaseModel):
 
 class BatchICDResponse(BaseModel):
     results: List[BatchChunkResult]
+
+# Schema for global reconciliation (PASS 2)
+class ReconciledDiagnosis(BaseModel):
+    condition: str
+    icd10: str
+    evidence_snippet: str
+    source_chunks: List[int]
+    reasoning: str
+
+class GlobalReconciliationResponse(BaseModel):
+    reconciled_diagnoses: List[ReconciledDiagnosis]

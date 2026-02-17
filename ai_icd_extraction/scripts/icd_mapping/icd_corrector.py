@@ -4,8 +4,8 @@ LLM-based ICD code correction using semantic search candidates.
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
-from utils.config import GOOGLE_API_KEY
-from utils.rate_limiter import AdaptiveRateLimiter
+from ai_icd_extraction.scripts.utils.config import GOOGLE_API_KEY
+from ai_icd_extraction.scripts.utils.rate_limiter import AdaptiveRateLimiter
 from .icd_vector_index import find_similar_by_invalid_code
 from .correction_filter import filter_codes_for_correction
 from typing import Optional, Dict, List, Tuple

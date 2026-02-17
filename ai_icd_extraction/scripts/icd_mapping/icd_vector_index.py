@@ -20,12 +20,12 @@ def load_faiss_index():
     global _faiss_index, _embeddings
     
     if _faiss_index is None:
-        index_path = "data/faiss_icd_index"
+        index_path = "ai_icd_extraction/data/faiss_icd_index"
         
         if not os.path.exists(index_path):
             raise FileNotFoundError(
                 f"FAISS index not found at {index_path}. "
-                "Run 'python scripts/build_faiss_index.py' first."
+                "Run 'python ai_icd_extraction/base_script/build_faiss_index.py' first."
             )
         
         # Initialize embeddings (must match the model used during index creation)

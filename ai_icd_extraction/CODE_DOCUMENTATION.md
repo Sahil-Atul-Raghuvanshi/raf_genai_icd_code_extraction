@@ -14,16 +14,15 @@
 
 ## Project Overview
 
-**RAFgenAI** is a clinical PDF processing system that extracts ICD-10-CM medical diagnosis codes using a hybrid approach combining:
-- **Regex Pattern Matching** (for explicitly mentioned codes)
-- **LLM Semantic Extraction** (for implicit diagnoses)
+**RAFgenAI** is a clinical PDF processing system that extracts ICD-10-CM medical diagnosis codes using a semantic AI approach combining:
+- **LLM Semantic Extraction** (AI-powered diagnosis extraction)
 - **FAISS Vector Search** (for code correction)
 - **GEM Mapping** (ICD-9 to ICD-10 conversion)
 - **Validation & Correction** (ensuring code accuracy)
 
 ### Key Features
 - ✅ Processes both digital and scanned PDFs (with OCR fallback)
-- ✅ Extracts ICD codes through hybrid regex + LLM approach
+- ✅ Extracts ICD codes through AI semantic understanding (LLM)
 - ✅ Validates codes against official 2026 ICD-10-CM master data
 - ✅ Auto-corrects invalid codes using FAISS semantic search + LLM
 - ✅ Converts ICD-9 codes to ICD-10 via GEM mappings with intelligent selection
@@ -56,17 +55,12 @@
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    ICD EXTRACTION LAYER                          │
-│  ┌──────────────────────────┐  ┌──────────────────────────┐    │
-│  │    Regex Extraction      │  │   LLM Extraction (Batch) │    │
-│  │  Pattern: [A-Z]\d{2}\.?  │  │  Gemini-2.5-Flash        │    │
-│  │  ICD-9: \d{3}\.\d{1,2}   │  │  Batch Size: 5 chunks    │    │
-│  └──────────────────────────┘  └──────────────────────────┘    │
-│                      │                    │                      │
-│                      └────────┬───────────┘                      │
-│                               ▼                                  │
-│                      ┌──────────────────┐                        │
-│                      │   Merge Results  │                        │
-│                      └──────────────────┘                        │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │            LLM Semantic Extraction (Batch)                │  │
+│  │              Gemini-2.5-Flash                             │  │
+│  │              Batch Size: 5 chunks                         │  │
+│  │     Extracts diagnoses with evidence snippets             │  │
+│  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                       │
                       ▼
@@ -144,7 +138,6 @@ RAFgenAI/
 │   └── ocr_engine.py              # OCR for scanned PDFs
 │
 ├── icd_mapping/                    # ICD Code Processing Module
-│   ├── icd_regex.py               # Regex pattern extraction
 │   ├── icd_validator.py           # Code validation against master data
 │   ├── icd_corrector.py           # LLM-based code correction
 │   ├── icd_vector_index.py        # FAISS semantic search
@@ -193,20 +186,11 @@ RAFgenAI/
    Input: Cleaned text
    Output: List of text chunks
    ↓
-5. Parallel Extraction
-   ├─ Regex Extraction (Pattern matching)
-   │  Input: Each chunk
-   │  Output: List of ICD codes per chunk
-   │
-   └─ LLM Extraction (Batch processing, 5 chunks at a time)
-      Input: Batches of 5 chunks
-      Output: List of (ICD codes + diagnosis objects) per chunk
+5. LLM Semantic Extraction (Batch processing, 5 chunks at a time)
+   Input: Batches of 5 chunks
+   Output: List of (ICD codes + diagnosis objects) per chunk
    ↓
-6. Merge Results (Unique codes per chunk)
-   Input: Regex codes + LLM codes
-   Output: Merged code list per chunk
-   ↓
-7. Validation (Against master data)
+6. Validation (Against master data)
    ├─ Validate as ICD-10
    │  Input: Merged codes
    │  Output: Valid ICD-10 codes + Mismatched codes
@@ -215,14 +199,14 @@ RAFgenAI/
       Input: Mismatched codes
       Output: Valid ICD-9 codes + Invalid codes
    ↓
-8. Smart Correction (Only for invalid semantic codes)
+7. Smart Correction (Only for invalid semantic codes)
    ├─ Filter: Instant fixes (E119 → E11.9)
    ├─ Filter: Skip low-confidence extractions
    └─ FAISS Search + LLM Selection (Parallel, max 3 workers)
       Input: Invalid code + condition text
       Output: Corrected ICD-10 code
    ↓
-9. GEM Mapping (ICD-9 → ICD-10)
+8. GEM Mapping (ICD-9 → ICD-10)
    Input: Valid ICD-9 codes
    Process:
    - Priority 1: approximate=1 mappings
@@ -230,16 +214,16 @@ RAFgenAI/
    - If multiple ICD-10 codes: LLM selects best match
    Output: Mapped ICD-10 codes
    ↓
-10. Combine Final Results
+9. Combine Final Results
     Input: Valid ICD-10 + Mapped ICD-10 + Corrected ICD-10
     Output: Final unique ICD-10 code list
     ↓
-11. Enrich with Metadata
+10. Enrich with Metadata
     Input: Final ICD-10 codes
     Process: Lookup descriptions + billable status
     Output: Enriched code table
     ↓
-12. Export & Display
+11. Export & Display
     Output: CSV file + Streamlit tables + Download button
 ```
 
@@ -367,31 +351,6 @@ RAFgenAI/
 ---
 
 ### 2. ICD Mapping Module
-
-#### `icd_regex.py`
-**Purpose**: Extract ICD codes using regex pattern matching.
-
-**Patterns**:
-- **ICD-10**: `[A-TV-Z][0-9]{2}(?:\.[0-9A-TV-Z]{1,4})?`
-  - Example: `E11.9`, `Z79.4`, `I10`
-- **ICD-9**: `(?:\d{3}\.\d{1,2}|\d{4,5})`
-  - Example: `250.00`, `4019`
-
-**Functions**:
-
-##### `extract_icd_codes(text: str) -> List[str]`
-- **Input**: 
-  - `text` (str): Text chunk
-- **Output**: 
-  - `List[str]`: Unique ICD codes found
-- **Logic**:
-  1. Applies ICD-10 pattern matching
-  2. Applies ICD-9 pattern matching
-  3. Combines matches (ICD-10 + ICD-9)
-  4. Removes duplicates while preserving order
-  5. Returns flat list of unique codes
-
----
 
 #### `icd_validator.py`
 **Purpose**: Validate extracted codes against official ICD master data.
@@ -1050,28 +1009,16 @@ cleaned_text = clean_text(raw_text)
 chunks = chunk_text_by_tokens(cleaned_text, max_tokens=200)
 ```
 
-##### **Step 3: Regex Extraction**
-```python
-chunk_regex_icds = [extract_icd_codes(chunk) for chunk in chunks]
-```
-
-##### **Step 4: LLM Semantic Extraction (Batch)**
+##### **Step 3: LLM Semantic Extraction (Batch)**
 ```python
 batch_results = extract_icd_from_chunks_batch(chunks, batch_size=5)
 
 for semantic_codes, diagnoses in batch_results:
     semantic_icd_list.append(semantic_codes)
-    diagnosis_objects_list.append(diagnoses)
+            diagnosis_objects_list.append(diagnoses)
 ```
 
-##### **Step 5: Merge Regex + LLM**
-```python
-for regex_codes, llm_codes in zip(chunk_regex_icds, semantic_icd_list):
-    combined = list(dict.fromkeys(regex_codes + llm_codes))
-    merged_icd_list.append(combined)
-```
-
-##### **Step 6: Load Master Data & Build Lookups**
+##### **Step 4: Load Master Data & Build Lookups**
 ```python
 icd10_master_df = pd.read_csv("data/icd10cm_2026.csv", dtype=str)
 icd9_master_df = pd.read_excel("data/valid_icd_9_codes.xlsx", dtype=str)
@@ -1091,21 +1038,20 @@ faiss_index = preload_faiss_index()
 billable_ratio = calculate_billable_ratio(icd10_master_df)
 ```
 
-##### **Step 7: Validation**
+##### **Step 5: Validation**
 ```python
-for merged_codes in merged_icd_list:
+for semantic_codes in semantic_icd_list:
     # Validate as ICD-10
-    matched_icd10, mismatched = validate_icd_codes(merged_codes, icd10_master_df)
+    matched_icd10, mismatched = validate_icd_codes(semantic_codes, icd10_master_df)
     
     # Validate mismatched as ICD-9
     matched_icd9, truly_invalid = validate_icd_codes(mismatched, icd9_master_df)
     
-    # Separate invalid by source (regex vs semantic)
-    invalid_regex = [code for code in regex_codes if code in truly_invalid]
-    invalid_semantic = [code for code in llm_codes if code in truly_invalid]
+    # All invalid codes are from semantic extraction
+    invalid_semantic = truly_invalid
 ```
 
-##### **Step 8: Correct Invalid Semantic Codes**
+##### **Step 6: Correct Invalid Semantic Codes**
 ```python
 # Create mapping of code → condition/evidence
 code_to_condition = {}
@@ -1132,10 +1078,10 @@ for result in parallel_results:
         # Validate corrected code
         validated, _ = validate_icd_codes([corrected_code], icd10_master_df)
         if validated:
-            matched_icd10.extend(validated)
+                    matched_icd10.extend(validated)
 ```
 
-##### **Step 9: GEM Mapping (ICD-9 → ICD-10)**
+##### **Step 7: GEM Mapping (ICD-9 → ICD-10)**
 ```python
 for icd9_code in matched_icd9:
     normalized = icd9_code.replace(".", "")
@@ -1177,33 +1123,30 @@ for icd9_code in matched_icd9:
         mapped_icd10.extend(selected_matches)
 ```
 
-##### **Step 10: Combine Final ICD-10 Codes**
+##### **Step 8: Combine Final ICD-10 Codes**
 ```python
 combined_icd10 = list(dict.fromkeys(matched_icd10 + mapped_icd10))
 ```
 
-##### **Step 11: Create DataFrame**
+##### **Step 9: Create DataFrame**
 ```python
 df = pd.DataFrame({
     "Chunk Number": range(1, len(chunks) + 1),
     "200 Token Chunk": chunks,
-    "regex_icd_codes": chunk_regex_icds,
     "semantic_icd_codes": semantic_icd_list,
-    "merged_icd_codes": merged_icd_list,
     "validated_icd10_codes": icd10_list,
     "validated_icd9_codes": icd9_list,
     "mapped_icd10_from_icd9": mapped_icd10_list,
     "icd9_to_icd10_mapping_dict": mapping_dictionary_list,
     "gem_llm_selections": gem_selections_list,
     "final_combined_icd10_codes": final_icd10_list,
-    "invalid_regex_icd_codes": invalid_regex_list,
     "invalid_semantic_icd_codes": invalid_semantic_list,
     "corrected_codes": corrected_codes_list,
     "correction_details": correction_details_list
 })
 ```
 
-##### **Step 12: Display Results**
+##### **Step 10: Display Results**
 ```python
 # Main results table
 st.dataframe(df, use_container_width=True, hide_index=True)
@@ -1278,7 +1221,7 @@ gem_df_display = pd.DataFrame(gem_table_data)
 st.dataframe(gem_df_display, use_container_width=True, hide_index=True)
 ```
 
-##### **Step 13: Export CSV**
+##### **Step 11: Export CSV**
 ```python
 os.makedirs("outputs", exist_ok=True)
 
@@ -1459,16 +1402,13 @@ Opens in browser at `http://localhost:8501`
 **Columns**:
 - `Chunk Number`: Sequential chunk index (1-based)
 - `200 Token Chunk`: Text content of chunk
-- `regex_icd_codes`: Codes extracted by regex
 - `semantic_icd_codes`: Codes extracted by LLM
-- `merged_icd_codes`: Combined regex + semantic codes
 - `validated_icd10_codes`: Valid ICD-10 codes
 - `validated_icd9_codes`: Valid ICD-9 codes
 - `mapped_icd10_from_icd9`: ICD-10 codes from GEM mapping
 - `icd9_to_icd10_mapping_dict`: Full mapping dictionary
 - `gem_llm_selections`: LLM selections for multi-mappings
 - `final_combined_icd10_codes`: Final ICD-10 codes (all sources)
-- `invalid_regex_icd_codes`: Invalid codes from regex
 - `invalid_semantic_icd_codes`: Invalid codes from LLM
 - `corrected_codes`: Codes after FAISS + LLM correction
 - `correction_details`: Full correction metadata

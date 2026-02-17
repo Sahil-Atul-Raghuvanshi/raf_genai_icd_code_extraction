@@ -7,9 +7,9 @@ import sys
 import os
 from pathlib import Path
 
-# Add parent directory to path so we can import from utils
-parent_dir = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(parent_dir))
+# Add project root to path
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 import pandas as pd
 from langchain_community.vectorstores import FAISS
@@ -25,7 +25,9 @@ def build_icd_faiss_index():
     """
     
     print("Loading ICD-10 codes...")
-    df = pd.read_csv("data/icd10cm_2026.csv", dtype=str)
+    # Update path to use relative path from script location
+    data_dir = Path(__file__).resolve().parent.parent / "data"
+    df = pd.read_csv(data_dir / "icd10cm_2026.csv", dtype=str)
     
     # Filter to only billable codes (optional - for better quality)
     # Uncomment the line below to only index billable codes
@@ -115,11 +117,11 @@ def build_icd_faiss_index():
         faiss_index.merge_from(idx)
     
     # Save to disk
-    index_path = "data/faiss_icd_index"
+    index_path = data_dir / "faiss_icd_index"
     os.makedirs(index_path, exist_ok=True)
     
     print(f"Saving index to {index_path}...")
-    faiss_index.save_local(index_path)
+    faiss_index.save_local(str(index_path))
     
     print(f"\n✅ FAISS index built successfully!")
     print(f"   Total codes indexed: {len(texts)}")

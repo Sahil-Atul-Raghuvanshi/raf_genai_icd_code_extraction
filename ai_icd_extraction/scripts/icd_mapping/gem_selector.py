@@ -8,8 +8,8 @@ import time
 import pandas as pd
 
 # Import shared LLM and prompt from clinical_extraction module
-from clinical_extraction.chain import llm_gem
-from clinical_extraction.prompts import GEM_SELECTION_PROMPT
+from ai_icd_extraction.scripts.clinical_extraction.chain import llm_gem
+from ai_icd_extraction.scripts.clinical_extraction.prompts import GEM_SELECTION_PROMPT
 
 
 def select_best_icd10_from_gem(
