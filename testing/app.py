@@ -7,10 +7,18 @@ Priority Logic:
 2. Fallback to approximate = 0
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Add parent directory to path to allow imports
+current_dir = Path(__file__).resolve().parent
+project_root = current_dir.parent
+sys.path.insert(0, str(project_root))
+
 import streamlit as st
 import pandas as pd
 import tempfile
-import os
 import datetime
 
 from ai_icd_extraction.scripts.document_processing.pdf_loader import extract_text_from_pdf

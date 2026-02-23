@@ -1,9 +1,10 @@
 """
 LLM-based ICD code correction using semantic search candidates.
+Returns detailed reasoning for FAISS corrections.
 """
 
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import PromptTemplate
+from ai_icd_extraction.scripts.clinical_extraction.prompts import FAISS_CORRECTION_PROMPT
 from ai_icd_extraction.scripts.utils.config import GOOGLE_API_KEY
 from ai_icd_extraction.scripts.utils.rate_limiter import AdaptiveRateLimiter
 from .icd_vector_index import find_similar_by_invalid_code
@@ -11,6 +12,7 @@ from .correction_filter import filter_codes_for_correction
 from typing import Optional, Dict, List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
+import json
 
 # Step 11: Tiered LLM approach for optimal speed/accuracy balance
 # Use Flash for code correction (good accuracy, reasonable speed)
@@ -27,67 +29,23 @@ llm_correction = ChatGoogleGenerativeAI(
 # Step 8: Smart rate limiter for correction LLM calls
 correction_rate_limiter = AdaptiveRateLimiter(max_rpm=60, buffer=0.9)
 
-# Prompt template for code correction
-CORRECTION_PROMPT = PromptTemplate(
-    input_variables=["invalid_code", "condition", "candidates"],
-    template="""You are a certified medical coder specializing in ICD-10-CM coding.
-
-CRITICAL RULES:
-1. You MUST select a BILLABLE ICD-10-CM code (ALL candidates provided are billable)
-2. You MUST NOT change the clinical meaning or severity
-3. You MUST NOT map acute codes to sequela codes or vice versa
-4. You MUST NOT downgrade specificity level
-
-The extracted ICD-10 code '{invalid_code}' is INVALID.
-The clinical condition is: '{condition}'
-
-Here are the top 5 most similar VALID and BILLABLE ICD-10 codes:
-{candidates}
-
-Task:
-Select the SINGLE ICD-10 code that BEST matches the condition.
-
-Selection Criteria (in priority order):
-1. CLINICAL ACCURACY - Must match the exact clinical meaning
-2. SPECIFICITY - Choose the most specific code that matches the documentation
-3. SEVERITY - Must preserve documented severity level (mild, moderate, severe, class I/II/III)
-4. LATERALITY - Must preserve side specification (left, right, bilateral, unilateral)
-5. EPISODE - Must preserve temporal classification (acute, chronic, sequela, initial/subsequent encounter)
-6. ANATOMICAL SITE - Must preserve specific body location if documented
-7. TYPE/SUBTYPE - Must preserve disease type, complication type, or subclassification
-
-FORBIDDEN Actions:
-❌ DO NOT map to parent/non-specific codes
-❌ DO NOT change temporal classification (acute ↔ chronic ↔ sequela)
-❌ DO NOT change disease category or system
-❌ DO NOT downgrade severity or specificity
-❌ DO NOT change laterality or anatomical location
-❌ DO NOT substitute "unspecified" codes when specific codes match
-
-Return ONLY the ICD-10 code (e.g., E11.9), nothing else.
-Do NOT include periods, explanations, or any other text.
-"""
-)
-
 
 def correct_invalid_code_detailed(
     invalid_code: str,
     condition_text: str,
+    evidence_snippet: str = "",
     max_retries: int = 2,
     billable_ratio: float = 0.85,
     use_fast_model: bool = False
 ) -> Optional[Dict]:
     """
     Correct an invalid ICD code using semantic search + LLM.
-    Returns detailed information about the correction process.
-    
-    Performance Optimization (Step 11):
-    - Can use faster model for simple corrections (high similarity scores)
-    - Default to standard model for complex corrections
+    Returns detailed information about the correction process including reasoning.
     
     Args:
         invalid_code: The invalid ICD code (LLM1 output)
         condition_text: Medical condition description (LLM1 output)
+        evidence_snippet: Clinical evidence snippet from document
         max_retries: Number of LLM retry attempts
         billable_ratio: Ratio of billable codes (for FAISS search optimization)
         use_fast_model: If True, use faster model (for simple corrections)
@@ -96,9 +54,11 @@ def correct_invalid_code_detailed(
         Dictionary with:
         - llm1_icd_code: Original invalid code
         - llm1_description: Original condition text
-        - top_5_similar_codes: List of (code, description, score) tuples
+        - top_5_similar_codes: Dict of {code: description} for top 5 candidates
         - llm2_valid_icd_code: Corrected code
         - llm2_valid_description: Description of corrected code
+        - reasoning: Detailed LLM reasoning for the correction
+        - evidence_snippet: Clinical evidence used
         Or None if correction fails
     """
     
@@ -117,8 +77,7 @@ def correct_invalid_code_detailed(
     if not candidates:
         return None
     
-    # Step 11: Use standard model for all corrections (for stability)
-    # The primary speedup comes from parallel processing (Step 2), not model selection
+    # Use standard model for all corrections (for stability)
     selected_llm = llm_correction
     
     # Format candidates for prompt
@@ -127,21 +86,34 @@ def correct_invalid_code_detailed(
         for code, description, score in candidates
     ])
     
-    # Step 2: Use LLM to select best match
+    # Step 2: Use LLM to select best match with reasoning
     corrected_code = None
+    reasoning = ""
+    
     for attempt in range(max_retries):
         try:
-            # Step 8: Smart rate limiting (only waits if needed)
+            # Smart rate limiting (only waits if needed)
             correction_rate_limiter.wait_if_needed()
             
-            prompt = CORRECTION_PROMPT.format(
+            prompt = FAISS_CORRECTION_PROMPT.format(
                 invalid_code=invalid_code,
                 condition=condition_text,
-                candidates=candidates_text
+                candidates=candidates_text,
+                evidence_snippet=evidence_snippet if evidence_snippet else "Not available"
             )
             
             response = selected_llm.invoke(prompt)
-            corrected_code = response.content.strip()
+            response_text = response.content.strip()
+            
+            # Parse JSON response
+            try:
+                parsed = json.loads(response_text)
+                corrected_code = parsed.get("selected_code", "").strip()
+                reasoning = parsed.get("reasoning", "")
+            except json.JSONDecodeError:
+                # Fallback: try to extract code from text
+                corrected_code = response_text
+                reasoning = "LLM response was not in JSON format"
             
             # Validate format (basic check)
             if len(corrected_code) >= 3 and corrected_code[0].isalpha():
@@ -151,11 +123,13 @@ def correct_invalid_code_detailed(
             if attempt == max_retries - 1:
                 # Fallback: return highest scoring candidate
                 corrected_code = candidates[0][0]
+                reasoning = f"LLM correction failed after {max_retries} attempts. Defaulted to highest similarity FAISS candidate. Error: {str(e)[:200]}"
             time.sleep(2)  # Backoff before retry
             continue
     
     if not corrected_code:
         corrected_code = candidates[0][0]  # Final fallback
+        reasoning = "LLM correction failed. Defaulted to highest similarity FAISS candidate."
     
     # Get description for corrected code
     corrected_description = None
@@ -178,7 +152,9 @@ def correct_invalid_code_detailed(
         "llm1_description": condition_text,
         "top_5_similar_codes": top_5_dict,
         "llm2_valid_icd_code": corrected_code,
-        "llm2_valid_description": corrected_description
+        "llm2_valid_description": corrected_description,
+        "reasoning": reasoning,
+        "evidence_snippet": evidence_snippet if evidence_snippet else "No specific evidence available"
     }
 
 
@@ -236,6 +212,7 @@ def correct_multiple_codes(
 def correct_codes_parallel(
     invalid_codes: List[str],
     condition_texts: List[str],
+    evidence_snippets: List[str] = None,
     max_workers: int = 3,
     detailed: bool = True,
     billable_ratio: float = 0.85
@@ -243,22 +220,16 @@ def correct_codes_parallel(
     """
     Correct multiple invalid codes in parallel using ThreadPoolExecutor.
     
-    This provides significant performance improvement for multiple corrections:
-    - Sequential: 12s for 3 codes (4s each)
-    - Parallel: 4s for 3 codes (67% reduction)
-    
     Args:
         invalid_codes: List of invalid ICD codes
         condition_texts: List of corresponding condition descriptions
+        evidence_snippets: Optional list of evidence snippets for each code
         max_workers: Maximum number of parallel workers (default: 3)
-                    Keep at 3 to avoid API rate limits
         detailed: If True, return detailed results; if False, return only codes
         billable_ratio: Ratio of billable codes (for FAISS search optimization)
     
     Returns:
         List of correction results in the SAME ORDER as input
-        If detailed=True: List of dictionaries with full correction details
-        If detailed=False: List of corrected codes (strings)
     """
     
     if len(invalid_codes) != len(condition_texts):
@@ -267,10 +238,16 @@ def correct_codes_parallel(
     if not invalid_codes:
         return []
     
-    # Create list of (index, code, condition) tuples to preserve order
+    # Handle evidence_snippets
+    if evidence_snippets is None:
+        evidence_snippets = [""] * len(invalid_codes)
+    elif len(evidence_snippets) != len(invalid_codes):
+        raise ValueError("evidence_snippets must have same length as invalid_codes")
+    
+    # Create list of (index, code, condition, evidence) tuples to preserve order
     tasks = [
-        (idx, code, condition) 
-        for idx, (code, condition) in enumerate(zip(invalid_codes, condition_texts))
+        (idx, code, condition, evidence) 
+        for idx, (code, condition, evidence) in enumerate(zip(invalid_codes, condition_texts, evidence_snippets))
     ]
     
     results = [None] * len(invalid_codes)  # Pre-allocate results array
@@ -283,15 +260,16 @@ def correct_codes_parallel(
                 correct_invalid_code_detailed if detailed else correct_invalid_code,
                 code,
                 condition,
+                evidence,  # Pass evidence snippet
                 2,  # max_retries
                 billable_ratio  # Pass billable_ratio
-            ): (idx, code, condition)
-            for idx, code, condition in tasks
+            ): (idx, code, condition, evidence)
+            for idx, code, condition, evidence in tasks
         }
         
         # Collect results as they complete
         for future in as_completed(future_to_task):
-            idx, code, condition = future_to_task[future]
+            idx, code, condition, evidence = future_to_task[future]
             
             try:
                 result = future.result(timeout=60)  # 60s timeout per task
