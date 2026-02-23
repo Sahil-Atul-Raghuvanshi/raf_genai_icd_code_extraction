@@ -1,11 +1,11 @@
 # RAF ICD Extraction System
 
-## 🏥 Overview
+## Overview
 An AI-powered system that automatically extracts ICD-10 codes from clinical documents using advanced NLP, semantic search, and LLM-based reasoning. The system provides complete transparency with evidence snippets and detailed reasoning for every extracted code.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Three-Tier Architecture
 
@@ -64,7 +64,7 @@ An AI-powered system that automatically extracts ICD-10 codes from clinical docu
 
 ---
 
-## 🔍 How ICD Codes Are Found
+## How ICD Codes Are Found
 
 ### The 7-Step Pipeline
 
@@ -151,7 +151,7 @@ Document → [1] → [2] → [3] → [4] → [5] → [6] → [7] → Final ICD-1
 
 ---
 
-## 💬 Prompts Explained
+## Prompts Explained
 
 ### 1. **ICD_SEMANTIC_BATCH_PROMPT**
 **Purpose:** Initial extraction of conditions and ICD codes from clinical text
@@ -237,7 +237,7 @@ Document → [1] → [2] → [3] → [4] → [5] → [6] → [7] → Final ICD-1
 
 ---
 
-## 🔄 ICD-9 to ICD-10 Mapping (GEM)
+## ICD-9 to ICD-10 Mapping (GEM)
 
 ### What is GEM?
 
@@ -296,7 +296,7 @@ ICD-9 Code → GEM Database → ICD-10 Candidate(s)
 
 ---
 
-## 🔎 FAISS: Semantic Search for Code Correction
+## FAISS: Semantic Search for Code Correction
 
 ### What is FAISS?
 
@@ -374,7 +374,7 @@ distances, indices = faiss_index.search(query_embedding, k=5)
 
 ---
 
-## 📊 Complete Pipeline Example
+## Complete Pipeline Example
 
 ### Input Document:
 ```
@@ -428,7 +428,7 @@ Also has stage 3 CKD related to diabetes.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -509,7 +509,7 @@ npm start
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 Automatic_Medical_Coder/
@@ -544,7 +544,7 @@ Automatic_Medical_Coder/
 
 ---
 
-## 🔒 Security
+## Security
 
 - `.env` files contain API keys - **NEVER commit to Git**
 - `.gitignore` configured to exclude sensitive files
@@ -553,7 +553,7 @@ Automatic_Medical_Coder/
 
 ---
 
-## 📈 Performance
+## Performance
 
 - **Batch Processing:** 5 chunks per LLM call (80% speedup)
 - **Parallel Correction:** Multi-threaded FAISS corrections
@@ -562,31 +562,13 @@ Automatic_Medical_Coder/
 
 ---
 
-## 🎯 Key Features
+## Key Features
 
-- ✅ Complete provenance tracking
-- ✅ Evidence snippets for every code
-- ✅ Detailed LLM reasoning
-- ✅ Service health monitoring
-- ✅ Real-time status updates
-- ✅ Automatic ICD-9 to ICD-10 conversion
-- ✅ Semantic code correction with FAISS
-- ✅ Beautiful, responsive UI
-
----
-
-## 📝 License
-
-[Your License Here]
-
----
-
-## 🤝 Contributing
-
-[Contributing guidelines]
-
----
-
-## 📧 Contact
-
-[Your contact information]
+- Complete provenance tracking
+- Evidence snippets for every code
+- Detailed LLM reasoning
+- Service health monitoring
+- Real-time status updates
+- Automatic ICD-9 to ICD-10 conversion
+- Semantic code correction with FAISS
+- Beautiful, responsive UI
